@@ -13,7 +13,7 @@ sainte_lague_seat_dist <- function(vote_df, seats_to_assign, init_div = 1.2 ){
     vote_df[max_quotient_idx, "quotient"] <- vote_df[max_quotient_idx, "votes"]/divisors[unlist(vote_df[max_quotient_idx, "float_seats"])]
     seats_to_assign <- seats_to_assign - 1
   }
-  vote_df %>% select(name, float_seats)
+  vote_df %>% select(-votes, -quotient)
 }
 
 # tests:
