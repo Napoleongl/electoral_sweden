@@ -1,19 +1,20 @@
-sainte_lague_seat_dist <- function(vote_df, seats_to_assign, init_div = 1.2 ){
+sainte_lague_seat_dist <- function(.data, seats_to_assign, init_div = 1.2, min_seats = 0L){
   divisors <- seq(0L, seats_to_assign) * 2 + 3
-  vote_df %<>% mutate(quotient = votes/init_div, float_seats = 0)
+  .data %<>% mutate(quotient = votes/init_div, seats = min_seats)
+  seats_to_assign <- seats_to_assign - min_seats * nrow(.data)
   while(seats_to_assign > 0){
     # For each seat, find the current highest quotient 
-    max_quotient_idx <- which(vote_df$quotient == max(vote_df$quotient))
+    max_quotient_idx <- which(.data$quotient == max(.data$quotient))
     if(length(max_quotient_idx) > 1) {
       max_quotient_idx <- sample(max_quotient_idx, 1)
       }
     # Add seat to obs with highest quotient
-    vote_df[max_quotient_idx, "float_seats"] <- vote_df[max_quotient_idx, "float_seats"] + 1
+    .data[max_quotient_idx, "seats"] <- .data[max_quotient_idx, "seats"] + 1
     # And recalc quotient by dividing original votes by next divisor
-    vote_df[max_quotient_idx, "quotient"] <- vote_df[max_quotient_idx, "votes"]/divisors[unlist(vote_df[max_quotient_idx, "float_seats"])]
+    .data[max_quotient_idx, "quotient"] <- .data[max_quotient_idx, "votes"]/divisors[unlist(.data[max_quotient_idx, "seats"])-min_seats]
     seats_to_assign <- seats_to_assign - 1
   }
-  vote_df %>% select(-votes, -quotient)
+  .data %>% select(-votes, -quotient)
 }
 
 # tests:
