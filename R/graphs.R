@@ -1,7 +1,8 @@
 library(waffle)
 library(emojifont)
+library(plotly)
 parliament_plot <- function(seats, colours, rows){
-  waffle(tibble::deframe(seats), rows = rows, colors = colours, legend_pos = "none")
+  waffle(tibble::deframe(seats), rows = rows, colors = colours)
 }
 
 float_seat_plot <- function(seats, colours, rows){
@@ -10,7 +11,7 @@ float_seat_plot <- function(seats, colours, rows){
 }
 
 
-seats <- tibble(block = valid_parties[4:7], seats = c(5,3,6,7))
+#seats <- tibble(block = valid_parties[4:7], seats = c(5,3,6,7))
 
 parliament_plot2 <- function(seats, colours, ncol){
   seat_seqs <- sapply(seats$seats, function(x){
@@ -41,8 +42,16 @@ votes_map <- function(.data, fills){
     aes(fill = block) +
     geom_sf(colour = "grey10", size = 0.1) + 
     theme_void() +
-    theme(legend.position = "left") +
+    theme(legend.position = "none") +
     scale_fill_manual(values = fills, drop = FALSE)}
 
 
+plotly_votes_map <- function(.data, fills){
+  plot_ly(.data, color =  ~block, stroke = I("black"), split=~area, 
+         span = I(0.1), colors = fills, hoveron = "fills", hoverinfo = "text",
+          text = ~paste("<b>", area, ":</b><br>", block, "vinner", seats, "mandat."), 
+          showlegend = FALSE) %>% 
+    layout(title = list(text = paste0("Mandatfördelning","\nPartigruppering: ", selected_mapping, 
+                                      ", Röstfördelning: ", summary_level)))
+}
 
