@@ -1,3 +1,4 @@
+# ====================== PREWORK ==========================
 library(dplyr)
 library(magrittr)
 library(readr)
@@ -12,57 +13,64 @@ datapath = "../input/valresultat/"
 map_path <- "../input/sweden-maps/"
 year = 2018L
 float_seats = 39L
-seat_rows = 18
-summary_level = summary_levels[3]
-summary_levels <- c("KOMMUNNAMN", "LÄNSNAMN", "VALKRETSNAMN")
+seat_rows = 16
 
-valid_parties = c('V', 'MP', 'S', 'C', 'L', 'M', 'KD', 'SD')
+
+
+valid_parties <- c('V', 'MP', 'S', 'C', 'L', 'M', 'KD', 'SD')
 party_colours <- setNames(c('#AF0000','#83CF39', '#EE2020', '#009933', 
                             '#6BB7EC', '#1B49DD', '#231977',  '#DDDD00'),
                           valid_parties)
 
 party_mapping <- tibble(party = valid_parties, 
-                        raw = valid_parties, 
-                        galtan = c(rep("GAL", 5), 
+                        Ingen = valid_parties, 
+                        GalTan = c(rep("GAL", 5), 
                                    rep("TAN",3)),
-                        val2014 =c(rep("Röd-Gröna", 3),
+                        Val2014 =c(rep("Röd-Gröna", 3),
                                    rep("Alliansen", 4),
                                    "SD")
                         )
-block_colours <- list(raw     = party_colours,
-                      galtan  = c("GAL" = "#22ccd8", 
-                                  "TAN" = "#010777"),
-                      val2014 = c("Röd-Gröna" = "#EE2020", 
-                                  "Alliansen"  = "lightblue", 
-                                  party_colours["SD"])
+block_colours <- list(Ingen = party_colours,
+                      GalTan   = c("GAL" = "#22ccd8", 
+                                   "TAN" = "#010777"),
+                      Val2014  = c("Röd-Gröna" = "#EE2020", 
+                                   "Alliansen"  = "lightblue", 
+                                   party_colours["SD"])
                       )
 
-available_mappings <- names(block_colours)
-selected_mapping = available_mappings[3]
-
-fixed_seats = read_csv(paste0(datapath, 'fasta_mandat_',summary_level, '_', year, '.csv'),
-                          col_types = list(col_character(), col_integer()), 
-                          progress = FALSE)
-
 rawdata <- readxl::read_xlsx(path = paste0(datapath, year, '_R_per_valdistrikt.xlsx'),
-                            sheet = 'R antal')
+                             sheet = 'R antal')
 
-districts  <- rawdata[, 1:8] %>% inner_join(fixed_seats)
 votes      <- rawdata[, c('LÄNSNAMN', 'KOMMUNNAMN', 'VALKRETSNAMN', 'VALDISTRIKTSKOD', valid_parties)] %>% 
   pivot_longer(cols = all_of(valid_parties),names_to = "party", values_to = "votes")
 
-swe_map_data <- read_sf(paste0(map_path, "gadm36_SWE_shp/", "gadm36_SWE_2L.shp")) %>% 
+raw_map_data <- read_sf(paste0(map_path, "gadm36_SWE_shp/", "gadm36_SWE_2LR.shp")) %>% 
   mutate(NAME_2 = replace(NAME_2, NAME_2=="Malung", "Malung-Sälen")) %>% 
   mutate(NAME_2 = replace(NAME_2, NAME_2=="Upplands-Väsby", "Upplands Väsby")) %>% 
-  mutate(kommun_join = tolower(NAME_2)) %>% 
+  mutate(kommun_join = tolower(NAME_2))
+
+# ====================== SETTINGS =========================
+summary_levels <- c("KOMMUNNAMN", "LÄNSNAMN", "VALKRETSNAMN")
+available_mappings <- names(block_colours)
+
+summary_level <- summary_levels[1]
+selected_mapping <- available_mappings[1]
+
+# ====================== DATA WRANGLING ===================
+fixed_seats <- read_csv(paste0(datapath, 'fasta_mandat_',summary_level, '_', year, '.csv'),
+                          col_types = list(col_character(), col_integer()), 
+                          progress = FALSE)
+
+districts  <- rawdata[, 1:8] %>% inner_join(fixed_seats)
+
+
+swe_map_data <- raw_map_data %>% 
   inner_join(districts %>% 
                group_by(KOMMUNNAMN) %>% 
-               select(!!summary_levels) %>% 
+               select(!!summary_levels, seats) %>% 
                unique() %>% 
                mutate(kommun_join = tolower(KOMMUNNAMN))
   ) 
-
-
 
 party_to_block <- party_mapping %>%  
   select(party,  !!selected_mapping) %>% 
@@ -79,10 +87,10 @@ votes_by_level <- votes %>%
 
 fixed_seats_assigned <- districts %>%  
   group_by(.dots=c(summary_level)) %>% 
-  summarise(seats =  max(seats)) %>%
+  summarise(seats =  max(seats)) %>% #using max since the number of sets was precalced and joined by summary_level already
   inner_join(votes_by_level) %>% 
   group_by(block) %>%
-  summarise(seats = sum(seats))
+  summarise(fixed_seats = sum(seats))
 
 # Calculate 'utjämningsmandat' on national level
 votes_total <- votes %>% 
@@ -92,28 +100,37 @@ votes_total <- votes %>%
   summarise(votes = sum(votes, na.rm=TRUE) )
 
 float_seats_assigned <- sainte_lague_seat_dist(votes_total, float_seats) %>% 
-  arrange(match(block, names(block_colours[[selected_mapping]]))) # Sorting necessary on data since waffle-plots don't look up colours by name.
+  arrange(match(block, names(block_colours[[selected_mapping]]))) %>% # Sorting necessary on data since waffle-plots don't look up colours by name.
+  rename(float_seats = seats)
 
-# Join float and fixed seats
+# Join float and fixed seats and turn into df of single seats
 total_seats_assigned <- fixed_seats_assigned %>% 
-  union(float_seats_assigned, by = "block") %>% 
-  group_by(block) %>% 
-  summarize(seats = sum(seats, na.rm = TRUE)) %>%
-  arrange(match(block, names(block_colours[[selected_mapping]])))
+  full_join(float_seats_assigned, by = "block") %>%
+  replace_na(list(fixed_seats = 0, float_seats = 0)) %>% 
+  #mutate(total_seats = fixed_seats + float_seats) %>% 
+  pivot_longer(cols = c(fixed_seats, float_seats), 
+               names_to = "seat_type", values_to = "seats") %>% 
+  arrange(match(block, names(block_colours[[selected_mapping]]))) %>% 
+  uncount(seats)
 
-total_seats <- sum(total_seats_assigned$seats)
+total_seats <- sum(total_seats_assigned$total_seats)
 
 votes_map_data <- swe_map_data %>% 
   group_by(.dots=c(summary_level)) %>% 
-  summarise() %>% 
-  inner_join(votes_by_level)
+  summarise(seats = max(seats)) %>% 
+  inner_join(votes_by_level) %>% 
+  st_cast("MULTIPOLYGON") %>% 
+  rename(area = !!summary_level)  
 
-votes_map(votes_map_data, block_colours[[selected_mapping]]) +
- 
-parliament_plot(total_seats_assigned, block_colours[[selected_mapping]], seat_rows) +
+# ====================== GRAPHING =========================
+votes_map_data %>% plotly_votes_map(block_colours[[selected_mapping]]) %>% 
+  htmlwidgets::saveWidget(paste0("_includes/swe_votes_map_",summary_level,"_",selected_mapping,".html"))
 
-plot_layout(nrow = 1, ncol = 2)
-  
-# manual version of waffles, displays fontawesome but varies in width
-#parliament_plot2(fixed_seats_assigned, block_colours[[selected_mapping]], seat_rows) + theme(legend.position =  "none")+
-#parliament_plot2(float_seats_assigned, block_colours[[selected_mapping]], ceiling(seat_rows/3)) +
+ggsave(paste0("_includes/swe_votes_map_",summary_level,"_",selected_mapping,".png"), 
+  votes_map(votes_map_data, block_colours[[selected_mapping]]) +
+  parliament_plot(total_seats_assigned[, c(1,4)], block_colours[[selected_mapping]], seat_rows) +
+  plot_layout(nrow = 1, ncol = 2, widths = c(2,3)) + 
+  plot_annotation(title = paste("Mandatfördelning, inklusive utjämningsmandat"),
+                  subtitle = paste0("Partigruppering: ", selected_mapping, 
+                                    ", Röstfördelning: ", summary_level)),
+  width = 6, height = 4, units = "in")
