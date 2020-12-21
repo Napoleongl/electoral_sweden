@@ -1,6 +1,8 @@
 # electoral_sweden
 Hur skulle det se ut om Sveriges riksdagsplatser delades ut med en winner-takes-it-all princip? Om alla mandat i en valkrets, län eller kommun tillföll det största partiet. Vi hade antagligen inte haft åtta partier som vi har idag, utan färre och större sammanslutningar, kanske motsvarande Alliansen och de Röd-Gröna från valet 2014 eller grupperat enligt Gal-Tan-skalan.
 
+En interaktiv version finns på [shinyapps.io](https://napoleongl.shinyapps.io/electoral_sweden/)
+
 ### Mandatfördelning
 Utöver de 310 mandat som fördelas olika geografiska områden efter befolkningsstorlek finns också 39 utjämningsmandat som fördelas med jämkade uddatals-metoden baserad på det totala antalet röster i hela landet.
 
