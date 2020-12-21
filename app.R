@@ -39,14 +39,13 @@ server <- function(input, output) {
   library(magrittr)
   library(readr)
   library(tidyr)
-  library(patchwork)
   library(sf)
   
-  source("functions.R")
-  source("graphs.R")
+  source("R/functions.R")
+  source("R/graphs.R")
   
-  datapath = "../data/valresultat/"
-  map_path <- "../data/sweden-maps/"
+  datapath = "data/valresultat/"
+  map_path <- "data/sweden-maps/"
   year = 2018L
   float_seats = 39L
   seat_rows = 16
